@@ -1,0 +1,7 @@
+runtime: nodejs8
+env: standard
+handlers:
+- url: /_nuxt
+  static_dir: .nuxt/dist
+- url: /.*
+  script: auto
