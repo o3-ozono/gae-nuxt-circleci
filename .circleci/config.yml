@@ -43,7 +43,7 @@ jobs:
             echo "$GOOGLE_AUTH" | base64 -i --decode > "$HOME/gcp-key.json"
             gcloud auth activate-service-account --key-file "$HOME/gcp-key.json"
             gcloud --quiet config set project "$GOOGLE_PROJECT_ID"
-            gcloud --quiet app deploy app.yaml --version $(echo $CIRCLE_BRANCH | sed "s/\//\-/g")
+            gcloud --quiet beta app deploy app.yaml --version $(echo $CIRCLE_BRANCH | sed "s/\//\-/g")
           no_output_timeout: 20m
 
 workflows:
