@@ -1,61 +1,50 @@
 version: 2
-
-# =============================================
-# References: Reusable Sets
-# =============================================
-references:
-  container_config: &container_config
-    docker:
-      - image: circleci/node
-    working_directory: ~/repo
-
-  restore_npm: &restore_npm
-    restore_cache:
-      keys:
-        - v1-cache-{{ arch }}-{{ .Branch }}-{{ checksum "package-lock.json" }}
-        - v1-cache-{{ arch }}-{{ .Branch }}
-        - v1-cache
-
-# =============================================
-# Jobs: Build and Deploy
-# =============================================
 jobs:
   build:
-    <<: *container_config
+    working_directory: ~/repo
+    docker:
+      - image: circleci/node:8
+
     steps:
       - checkout
-      - *restore_npm
       - run:
-          name: Install Dependencies
+          name: System information
+          command: |
+            echo "Node $(node -v)"
+            echo "npm v$(npm -v)"
+      - run:
+          name: Install dependencies
           command: npm install
-      - save_cache:
-          key: v1-cache-{{ arch }}-{{ .Branch }}-{{ checksum "package-lock.json" }}
-          paths:
-            - node_modules
       - run:
           name: Build
           command: npm run build
-      - persist_to_workspace:
-          root: .nuxt/dist
-          paths:
-            - .
       # - run:
       #     name: Test
-      #     command: npm test
+      #     command: yarn test
+      - save_cache:
+          key: cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/repo/.cache/yarn
+            - ~/repo/.nuxt/dist
+            - ~/repo/node_modules
+            - ~/repo/package.json
 
   deploy:
-    <<: *container_config
+    working_directory: ~/repo
+    docker:
+      - image: google/cloud-sdk
+
     steps:
       - checkout
-      - *restore_npm
-      - run:
-          name: Set $PATH for `gcloud` command
-          command: echo 'source /home/circleci/repo/node_modules/@google-cloud/cloud-sdk/google-cloud-sdk/path.bash.inc' >> $BASH_ENV
-      - attach_workspace:
-          at: .nuxt/dist
+      - restore_cache:
+          key: cache-{{ .Branch }}-{{ checksum "yarn.lock" }}
       - run:
           name: Deploy to Google App Engine
-          command: gcloud app deploy app.yaml
+          command: |
+            echo "$GOOGLE_AUTH" | base64 -i --decode > "$HOME/gcp-key.json"
+            gcloud auth activate-service-account --key-file "$HOME/gcp-key.json"
+            gcloud --quiet config set project "$GOOGLE_PROJECT_ID"
+            gcloud --quiet app deploy app.yaml --version $(echo $CIRCLE_BRANCH | sed "s/\//\-/g")
           no_output_timeout: 20m
 
 workflows:
